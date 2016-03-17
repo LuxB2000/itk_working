@@ -1,0 +1,212 @@
+#include "MRIcorrections.h"
+
+/*
+ * constructor
+ */
+template<class TImage, class TMesh, const unsigned int Dimension>
+MRICorrections<TImage,TMesh,Dimension>::MRICorrections()
+{
+}
+
+/*
+ * destructor
+ */
+template<class TImage, class TMesh, const unsigned int Dimension>
+MRICorrections<TImage,TMesh,Dimension>::~MRICorrections()
+{
+	if( m_refCor )
+	{
+		delete m_refCor;
+	}
+
+}
+
+/*
+ * Update
+ */
+template<class TImage, class TMesh, const unsigned int Dimension>
+void
+MRICorrections<TImage,TMesh,Dimension>::Update()
+{
+	std::cout << ">> -- MRI correction factors computation starts."<< std::endl;
+	std::cout << "\n -- 1 -- \n" << std::endl;
+	this->m_computeMeanPerSlice( 1 );
+	std::cout << "\n -- 2 -- \n" << std::endl;
+	this->m_computeMeanPerSlice( 2 );
+	//std::cout<< "Test: "<<std::endl;
+	int l=m_prePerSlice->size();
+	//for( int i=0; i<l; i++ ){
+	//	std::cout<< m_prePerSlice->at(i) << ", ";
+	//}
+	//std::cout<<std::endl;
+
+	//l=m_postPerSlice->size();
+	//for( int i=0; i<l; i++ ){
+	//	std::cout<< m_postPerSlice->at(i) << ", ";
+	//}
+	//std::cout<<std::endl;
+
+	//l=m_prePerSlice->size();
+	m_refCor = new VectorType(l,1);
+	for( int i=0; i<l; i++ ){
+		if( m_postPerSlice->at(i) != 0 ){
+			m_refCor->at(i) = m_prePerSlice->at(i) / m_postPerSlice->at(i);
+		}else{
+			m_refCor->at(i) = 1;
+		}
+	}
+	std::cout << ">>  -- MRI correction factors computation ends."<< std::endl;
+
+}
+
+/*
+ * computeMeanPerSlice
+ */
+template<class TImage, class TMesh, const unsigned int Dimension>
+void
+MRICorrections<TImage,TMesh,Dimension>::m_computeMeanPerSlice(
+		int option)
+{
+	typename ImageType::Pointer im;
+	if( option == 1 ){
+		im = m_pre;
+	}else if(option ==2 ){
+		im = m_postPhantom;
+	}
+	typename ImageType::SizeType size =
+							im->GetLargestPossibleRegion().GetSize();
+
+	std::cout << "image region: " << im->GetLargestPossibleRegion() << std::endl;
+	std::cout << "image origin: " << im->GetOrigin() << std::endl;
+
+	VectorType* infoPerSlice;
+	if( option == 1 ){
+		m_prePerSlice = new VectorType( size[2], 1 );
+		infoPerSlice = m_prePerSlice;
+	}else if( option == 2 ){
+		m_postPerSlice = new VectorType( size[2], 1 );
+		infoPerSlice = m_postPerSlice;
+	}
+
+/*	typedef Mesh2BM<ImageType,MeshType,3> Mesh2BMType;
+	Mesh2BMType mesh2bm = Mesh2BMType();
+	mesh2bm.SetReferenceImage( im );
+	mesh2bm.SetMesh( m_refMesh );
+	mesh2bm.Update();
+
+	typename ImageType::Pointer BM = mesh2bm.GetOutput();
+*/
+	typename ImageType::IndexType outputStart, test, test2;
+
+	//typedef itk::Image< typename ImageType::PixelType, 3 > SliceType;
+	typedef itk::ResampleImageFilter< ImageType, SliceType > ResamplerType;
+	typedef itk::IdentityTransform< double, Dimension > TransformType;
+	
+	typename ImageType::SizeType sliceSize =
+						im->GetLargestPossibleRegion().GetSize();
+	sliceSize[2] = 1;
+
+	typedef itk::NearestNeighborInterpolateImageFunction<
+					ImageType, double > InterpolatorType;
+	typename InterpolatorType::Pointer interpolator = InterpolatorType::New();
+
+	// extract each slice
+	/*
+	for( unsigned int z = 0; z<size[2]; z ++ )
+	{
+		typename ResamplerType::Pointer resample = ResamplerType::New();
+			resample->SetOutputSpacing( im->GetSpacing() );
+			resample->SetOutputOrigin ( im->GetOrigin() );
+			resample->SetSize( sliceSize );
+			resample->SetOutputDirection( im->GetDirection() );
+		typename TransformType::Pointer transform = TransformType::New();
+		transform->SetIdentity();
+		resample->SetTransform( transform );
+		resample->SetInterpolator( interpolator );
+
+		outputStart[0]=0;
+		outputStart[1]=0;
+		outputStart[2]=z;
+		
+		resample->SetOutputStartIndex( outputStart );
+
+		std::cerr << " #### " << z << " ####### " << std::endl;
+		resample->SetInput( im );
+		try{
+			resample->Update();
+		}catch( itk::ExceptionObject &err){
+			std::cerr << err << std::endl;
+		}
+
+		//typename SliceType::Pointer slice = resample->GetOutput();
+		//double mean = m_extractSliceInfo(slice);
+
+	}
+	*/
+	typedef MeshTools<ImageType, MeshType> MeshToolsType;
+	MeshToolsType meshTool = MeshToolsType( im, m_refMesh);
+	typename ImageType::RegionType regionMesh = meshTool.ComputeMeshRegion();
+
+	typename ImageType::SizeType sizeToParse = regionMesh.GetSize();
+	std::cout << "size to parse: " << sizeToParse << std::endl;
+	/*
+									im->GetLargestPossibleRegion().GetSize();
+									*/
+	sizeToParse[2] = 1;
+	typename ImageType::IndexType start = regionMesh.GetIndex();
+	start.Fill(0);
+	typedef itk::ImageRegionConstIteratorWithIndex< ImageType > 
+																	ConstIteratorType;
+
+	typedef itk::MeshSpatialObject< MeshType >		 MeshSpatialObjectType;
+	typename MeshSpatialObjectType::Pointer spatialMesh =
+															MeshSpatialObjectType::New();
+	spatialMesh->SetMesh( m_refMesh );
+
+	for( unsigned int z=0; z<size[2]; z++ )
+	{
+		long sum = 0;
+		long N = 0;
+		start[2] = z;
+
+		typename ImageType::RegionType region(start,sizeToParse);
+		typename ImageType::PointType point;
+
+		ConstIteratorType itIm( im, region);
+
+		for( itIm.GoToBegin();!itIm.IsAtEnd(); ++itIm ){
+			im->TransformIndexToPhysicalPoint( itIm.GetIndex(), point );
+			if( spatialMesh->IsInside( point ) ){
+				sum += itIm.Get();
+				//if( z==4 ) std::cout << sum << " / " << itIm.Get() << std::endl;
+				N ++;
+			}
+		}
+
+		// compute the mean per slice
+		if( (N>0) && (sum>0) ){
+			infoPerSlice->at(z) = (double) (sum / N);
+		}else{
+			infoPerSlice->at(z) = 1;
+		}
+
+		//std::cout << "z= " << z << " N=" << N << " Sum="<< sum << " Mean= " 
+		//	<< infoPerSlice->at(z) << std::endl;
+	}
+
+}
+
+/*
+ * Get corrections
+ * Main idea: use the Mesh to get a BM, transform the BM to a labelMap and then
+ * automatically extract parametrs
+ * See 
+ * # http://www.vtk.org/Wiki/ITK/Examples/ImageProcessing/LabelStatisticsImageFilter
+ * # http://www.itk.org/pipermail/insight-users/2010-December/039221.html
+ */
+template<class TImage, class TMesh, const unsigned int Dimension>
+typename MRICorrections<TImage,TMesh,Dimension>::VectorType*
+MRICorrections<TImage,TMesh,Dimension>::GetReferenceSignalCorrections()
+{
+	return m_refCor;
+}

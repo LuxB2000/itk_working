@@ -1,0 +1,99 @@
+#ifndef __MRICORRECTIONS__
+#define __MRICORRECTIONS__
+
+/*
+ * A class that computes the different corrections to apply to MRI images 
+ * these corrections are due to non constant scanner parameters.
+ *
+ * 2014
+ * Author J Plumat, UoA
+ */
+
+#include "itkHistogram.h"
+#include "itkSparseFrequencyContainer2.h"
+#include "itkImageRegionConstIterator.h"
+#include "itkMeshSpatialObject.h"
+
+#include <itkCastImageFilter.h>
+
+// dealing with Mesh
+//#include "../libimages/mesh2bm.h"
+#include "../meshtools/meshtools.h"
+
+#include "itkBinaryImageToLabelMapFilter.h"
+#include "itkLabelMapToLabelImageFilter.h"
+#include "itkLabelStatisticsImageFilter.h"
+#include "itkTriangleMeshToBinaryImageFilter.h"
+
+#include "itkIdentityTransform.h"
+#include "itkResampleImageFilter.h"
+
+#include "itkNearestNeighborInterpolateImageFunction.h"
+
+#include <vector>
+
+template <class TImage, class TMesh, unsigned int Dimension>
+class MRICorrections{
+	public:
+		typedef TImage ImageType;
+		typedef TMesh  MeshType;
+		typedef std::vector<double> VectorType;
+
+		MRICorrections();
+		~MRICorrections();
+
+		void SetReferenceMesh(typename MeshType::Pointer refMesh){
+			m_refMesh = refMesh;
+			//std::cout<< m_refMesh << std::endl;
+		}
+		void SetPreImage(typename ImageType::Pointer preImage){
+			m_pre = preImage;
+		}
+		void SetPostPhantomImage(typename ImageType::Pointer postImage){
+			m_postPhantom = postImage;
+		}
+		void SetPostIEImage(typename ImageType::Pointer postImage){
+			m_postIE = postImage;
+		}
+
+		void Update();
+
+		/*
+		 * Get a vector of size refImage->GetLargestPossibleRegion().GetSize[2]
+		 * the default value is 1
+		 * Otherwise the value at position P in vector is 
+		 * mean(Pre(:,:,P))/mean(Post(:,:,P)) with pixels inside the refMesh
+		 */
+		VectorType* GetReferenceSignalCorrections();
+
+
+	private:
+		typedef itk::Image< typename ImageType::PixelType, 3 > SliceType;
+
+		void m_computeMeanPerSlice(int o);
+		double m_extractSliceInfo( typename SliceType::Pointer slice );
+		void buildVectorHistogram(int sz);
+
+		VectorType* m_prePerSlice, * m_postPerSlice;
+
+		typename MeshType::Pointer m_refMesh;
+		typename ImageType::Pointer m_pre, m_postPhantom, m_postIE;
+		VectorType* m_refCor;
+		
+		typedef typename ImageType::PixelType					MeasurementType;
+		typedef itk::Statistics::SparseFrequencyContainer2
+																									FrequencyContainerType;
+		typedef FrequencyContainerType::AbsoluteFrequencyType FrequencyType;
+		typedef itk::Statistics::Histogram< MeasurementType,
+																	FrequencyContainerType > HistogramType;
+		//typedef std::vector< HistogramType > VectorHistogramType;
+		typedef std::vector< std::vector< MeasurementType >* > VectorHistogramType;
+		VectorHistogramType* m_histogramPerSlice;
+};
+
+#ifndef ITK_MANUAL_INSTANTIATION
+#include "MRIcorrections.cxx"
+#endif
+
+#endif
+
