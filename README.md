@@ -6,11 +6,13 @@ Some tools and bash pipelines to run registrations, segmentations and image mani
 ## Build
 On Linux workstation:
 
-> $ mkdir build
-> $ mkdir bin
+> $ mkdir build bin
+
 > $ cd build
+
 > $ cmake ..
-$ make
+
+> $ make
 
 ## Tools
 
