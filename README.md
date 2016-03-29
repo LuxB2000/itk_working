@@ -1,7 +1,7 @@
 # ITK tools - DCE MRI pipelines
 Some tools and bash pipelines to run registrations, segmentations and image manipulations with ITK. Tools have been designed in the DCE-MRI context. 
 
-The tools are small binaries. Use the bash stript to run a pipeline. The main goal of these tools is to measure the uptake of contrast based agent in region of interests.
+The tools are small binaries. Use the bash script to run a pipeline. The main goal of these tools is to measure the uptake of contrast agent in region of interests.
 
 Warning: the framework has been designed for Linux stations. If you want to use it on MacOs or Window you need to write your own pipeline file. However, you should be able to compile them without error - not been tested so far.
 
