@@ -6,6 +6,8 @@
 #         USAGE: ./pipeline_example.sh 
 # 
 #   DESCRIPTION: 
+#		WARNING: This pipeline is made for learning purpose. It doesn't compute
+#		any actual concentration nor any 
 # 
 #       OPTIONS: ---
 #  REQUIREMENTS: ITK, Cmake
@@ -21,6 +23,8 @@ set -o nounset        # Treat unset variables as an error
 
 BINPATH=../bin
 DATAPATH=../test_data
+CONCENTRATIONPATH=$DATAPATH/concentrations
+ATLASPATH=$DATAPATH/atlas
 
 # inputs
 # we assume that fixed and moving are normalized images. We put a phantom
@@ -34,11 +38,10 @@ ATLASIM=$DATAPATH/atlas_volume.mha
 # outputs
 DEFORMEDIM1=$DATAPATH/deformed_volume1.mha
 DEFORMEDIM2=$DATAPATH/deformed_volume2.mha
-DEFORMEDATLAS=$DATAPATH/deformed_atlas.mha
-CONCVOLUME1=$DATAPATH/concentrations/concentration_volume1.mha
-CONCVOLUME2=$DATAPATH/concentrations/concentration_volume2.mha
-
-mkdir ./../test_data/concentrations
+DEFORMEDATLAS=$ATLASPATH/deformed_atlas.mha
+CONCVOLUME1=$CONCENTRATIONPATH/concentration_volume1.mha
+CONCVOLUME2=$CONCENTRATIONPATH/concentration_volume2.mha
+VOLUME4D=$CONCENTRATIONPATH/4D-volume.mha
 
 # temporary data
 TMPPATH=/tmp
@@ -50,6 +53,9 @@ NORMFIXED=$TMPPATH/norm_fixed.mha
 
 # Create the data
 #----------------
+mkdir $CONCENTRATIONPATH
+mkdir $ATLASPATH
+
 cd ../test_data
 matlab -nojvm -nodisplay -nosplash -r create_data
 cd ../pipelines
@@ -62,7 +68,8 @@ cd ../pipelines
 ./$BINPATH/MMRigid $FIXEDIM $MOVINGIM2 $DEFORMEDIM2 2 10 $DIRTRANSFORM $INVTRANSFORM
 
 # Do non rigid registration between fixed and atlas
-./$BINPATH/registerDemons $FIXEDIM $ATLASIM $DEFORMEDATLAS $DEFFIELD
+./$BINPATH/MMRigid $FIXEDIM $ATLASIM $DEFORMEDATLAS 1 10 $DIRTRANSFORM $INVTRANSFORM 3 3 0
+./$BINPATH/registerDemons $FIXEDIM $DEFORMEDATLAS $DEFORMEDATLAS $DEFFIELD
 
 # Concentration
 # -------------
@@ -74,9 +81,9 @@ cd ../pipelines
 
 # Compute 4D volume
 # -----------------
-
+./$BINPATH/compute4dData $CONCENTRATIONPATH $VOLUME4D
 
 # ROI measurements
 # ----------------
 # Extract the concentration in the different parts of the atlas
-
+./$BINPATH/computeStat $VOLUME4D $ATLASPATH

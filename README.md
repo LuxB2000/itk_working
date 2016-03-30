@@ -11,6 +11,8 @@ CMake, ITK, VTK.
 ## Build
 On Linux workstation:
 
+> cd /itk_working-master/
+
 > $ mkdir build bin
 
 > $ cd build
@@ -23,3 +25,4 @@ On Linux workstation:
 All the tools have a help, just run it without any input to have information. Most of the tools have been developped in the DCE-MRI contexts. It extracts region of interest, it does registration between volumes and volume and atlas. Some tools are dedicated to read and write images. Volumes are assumed to 3D but 4D volumes can be written and read. 4D volumes are timeline DCE-MRI, on each pixel location a vector contains values representing values along the time.
 
 ## Pipelines
+We name pipeline a list
